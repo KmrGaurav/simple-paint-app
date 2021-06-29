@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body style="margin: 0; box-sizing: border-box; background-color: #e0e0e0;">
+    <div style="text-align: center;">
+        <h1 style="font-family: sans-serif; color: grey; user-select: none;">Simple Paint App</h1>
+        <canvas id="canvas" style="border: 5px solid grey; margin: 10px auto; display: block; background-color: white;"></canvas>
+        <button onclick="clearRectangles()" style="width: 100px; height: 30px; font-weight: bold; color: grey; border: 2px solid grey; user-select: none;">Clear</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.canvas.width  = window.innerWidth  * .9;
+        ctx.canvas.height = window.innerHeight * .8;
+        
+        
+        function getMousePosition(canvas, event) {
+            let rect = canvas.getBoundingClientRect();
+            const offset = 5; // Because of border of canvas
+            let x = event.clientX - rect.left - offset;
+            let y = event.clientY - rect.top - offset;
+            return { x: x, y: y };
+        }
+
+        let rectangle = {};
+
+        let mouseDown = false;
+
+        canvas.addEventListener("mousedown", function(e) {
+            let point = getMousePosition(canvas, e);
+            rectangle.x1 = point.x;
+            rectangle.y1 = point.y;
+            mouseDown = true;
+        });
+        canvas.addEventListener("mouseup", function(e) {
+            let point = getMousePosition(canvas, e);
+            rectangle.x2 = point.x;
+            rectangle.y2 = point.y;
+            rectangle.color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+            g_rectangles = JSON.parse(JSON.stringify([...g_rectangles, rectangle]))
+            mouseDown = false;
+            rectangle = {}
+        });
+        canvas.addEventListener("mousemove", function(e) {
+            if (mouseDown) {
+                let point = getMousePosition(canvas, e);
+                rectangle.x2 = point.x;
+                rectangle.y2 = point.y;
+            }
+        });
+        document.addEventListener("mouseup", function(e) {
+            if (!e.target.matches('canvas')) {
+                mouseDown = false;
+                rectangle = {}
+            }
+        })
+
+
+        let g_rectangles = []; //[{ x1: 100, y1: 100, x2: 500, y2: 400, color: '#ff00ff' }, { x1: 300, y1: 300, x2: 800, y2: 700, color: '#0000ff' }];
+
+        const clearRectangles = () => g_rectangles = []
+
+        function draw(context) {
+            const drawRectangle = (context, x1, y1, x2, y2, color, fill = true) => {
+                context.beginPath();
+                context.moveTo(x1, y1);
+                context.lineTo(x2, y1);
+                context.lineTo(x2, y2);
+                context.lineTo(x1, y2);
+                context.closePath();
+                context.fillStyle = color;
+                if (fill) {
+                    context.fill();
+                } else {
+                    context.stroke();
+                }
+            }
+            
+            g_rectangles.map(rectangle => {
+                drawRectangle(context, rectangle.x1, rectangle.y1, rectangle.x2, rectangle.y2, rectangle.color);
+            })
+            drawRectangle(context, rectangle.x1, rectangle.y1, rectangle.x2, rectangle.y2, '#000000', false)
+        }
+
+        (function loop () {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            draw(ctx);
+            window.requestAnimationFrame(loop);
+        })();
+    </script>
+</body>
+</html>
