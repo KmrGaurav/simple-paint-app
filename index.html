@@ -10,7 +10,7 @@
     <div style="text-align: center;">
         <h1 style="font-family: sans-serif; color: grey; user-select: none;">Simple Paint App</h1>
         <canvas id="canvas" style="border: 5px solid grey; margin: 10px auto; display: block; background-color: white;"></canvas>
-        <button onclick="clearRectangles()" style="width: 100px; height: 30px; font-weight: bold; color: grey; border: 2px solid grey; user-select: none;">Clear</button>
+        <button onclick="(() => g_rectangles = [])()" style="width: 100px; height: 30px; font-weight: bold; color: grey; border: 2px solid grey; user-select: none;">Clear</button>
     </div>
 
     <script>
@@ -20,7 +20,7 @@
         ctx.canvas.height = window.innerHeight * .8;
         
         
-        function getMousePosition(canvas, event) {
+        const getMousePosition = (canvas, event) => {
             let rect = canvas.getBoundingClientRect();
             const offset = 5; // Because of border of canvas
             let x = event.clientX - rect.left - offset;
@@ -28,43 +28,158 @@
             return { x: x, y: y };
         }
 
-        let rectangle = {};
+        let g_curPos = {};
+        let g_rectangle = {};
 
-        let mouseDown = false;
+        let g_mouseDown = false;
+        
+        let g_overARect = false;
+        let g_isDragging = false;
+        let g_dragRect = {};
+        let g_dragOffset = {};
+        let g_dragLastPosition = {};
+        let g_originalRectPos = {};
+        let g_doubleClick = false;
 
         canvas.addEventListener("mousedown", function(e) {
+            if (g_overARect) {
+                g_dragLastPosition.x = g_curPos.x;
+                g_dragLastPosition.y = g_curPos.y;
+
+                g_originalRectPos.x1 = g_dragRect.x1;
+                g_originalRectPos.y1 = g_dragRect.y1;
+                g_originalRectPos.x2 = g_dragRect.x2;
+                g_originalRectPos.y2 = g_dragRect.y2;
+
+                g_isDragging = true;
+            } 
+
             let point = getMousePosition(canvas, e);
-            rectangle.x1 = point.x;
-            rectangle.y1 = point.y;
-            mouseDown = true;
+            g_rectangle.x1 = point.x;
+            g_rectangle.y1 = point.y;
+            g_mouseDown = true;
+        });
+        canvas.addEventListener("dblclick", () => {
+            if (g_overARect) {
+                g_doubleClick = true;
+            }
         });
         canvas.addEventListener("mouseup", function(e) {
-            let point = getMousePosition(canvas, e);
-            rectangle.x2 = point.x;
-            rectangle.y2 = point.y;
-            rectangle.color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
-            g_rectangles = JSON.parse(JSON.stringify([...g_rectangles, rectangle]))
-            mouseDown = false;
-            rectangle = {}
+            if (g_isDragging) {
+                
+            } else {
+                let point = getMousePosition(canvas, e);
+                g_rectangle.x2 = point.x;
+                g_rectangle.y2 = point.y;
+                g_rectangle.color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+                g_rectangles = JSON.parse(JSON.stringify([...g_rectangles, g_rectangle]))
+                g_mouseDown = false;
+                g_rectangle = {}
+            }
+
+            g_isDragging = false;
         });
         canvas.addEventListener("mousemove", function(e) {
-            if (mouseDown) {
-                let point = getMousePosition(canvas, e);
-                rectangle.x2 = point.x;
-                rectangle.y2 = point.y;
+            g_curPos = getMousePosition(canvas, e);
+            if (g_mouseDown) {
+                g_rectangle.x2 = g_curPos.x;
+                g_rectangle.y2 = g_curPos.y;
+
+                if (g_isDragging) {
+                    g_dragOffset.x = g_curPos.x - g_dragLastPosition.x;
+                    g_dragOffset.y = g_curPos.y - g_dragLastPosition.y;
+
+                    g_dragRect.x1 = g_originalRectPos.x1 + g_dragOffset.x;
+                    g_dragRect.x2 = g_originalRectPos.x2 + g_dragOffset.x;
+                    g_dragRect.y1 = g_originalRectPos.y1 + g_dragOffset.y;
+                    g_dragRect.y2 = g_originalRectPos.y2 + g_dragOffset.y;
+                }
             }
         });
         document.addEventListener("mouseup", function(e) {
-            if (!e.target.matches('canvas')) {
-                mouseDown = false;
-                rectangle = {}
+            if (g_overARect) {
+
+            } else {
+                if (!e.target.matches('canvas')) {
+                    g_rectangle = {};
+                }
             }
+            g_rectangle = {};
+            g_dragLastPosition = {};
+            g_mouseDown = false;
+            g_isDragging = false;
         })
 
 
-        let g_rectangles = []; //[{ x1: 100, y1: 100, x2: 500, y2: 400, color: '#ff00ff' }, { x1: 300, y1: 300, x2: 800, y2: 700, color: '#0000ff' }];
+        let g_rectangles = [];//[{ x1: 100, y1: 100, x2: 400, y2: 300, color: '#ff00ff' }]//, { x1: 700, y1: 300, x2: 500, y2: 100, color: '#0000ff' }];
 
-        const clearRectangles = () => g_rectangles = []
+        const update = () => {
+            const overARect = (rectangles, curPos) => {
+                const isInside = (rect, curPos) => {
+                    if (rect.x1 < rect.x2 && rect.y1 < rect.y2) {
+                        if (rect.x1 <= curPos.x && curPos.x <= rect.x2 && rect.y1 <= curPos.y && curPos.y <= rect.y2) {
+                            return true;
+                        }
+                    } else if (rect.x1 < rect.x2 && rect.y1 > rect.y2) {
+                        if (rect.x1 <= curPos.x && curPos.x <= rect.x2 && rect.y1 >= curPos.y && curPos.y >= rect.y2) {
+                            return true;
+                        }
+                    } else if (rect.x1 > rect.x2 && rect.y1 < rect.y2) {
+                        if (rect.x1 >= curPos.x && curPos.x >= rect.x2 && rect.y1 <= curPos.y && curPos.y <= rect.y2) {
+                            return true;
+                        }
+                    } else if (rect.x1 > rect.x2 && rect.y1 > rect.y2) {
+                        if (rect.x1 >= curPos.x && curPos.x >= rect.x2 && rect.y1 >= curPos.y && curPos.y >= rect.y2) {
+                            return true;
+                        }
+                    } 
+
+                    return false;
+                }
+
+                for (let i = rectangles.length - 1; i >= 0; i--) {
+                    let rectangle = rectangles[i];
+                    if (isInside(rectangle, curPos)) {
+                        return rectangle;
+                    } 
+                }
+                
+                return null;
+            }
+
+            let rect = overARect(g_rectangles, g_curPos);
+            if (rect) {
+                if (g_mouseDown) {
+                    let top = g_rectangles[g_rectangles.length - 1];
+                    if (top.x1 !== rect.x1 || top.y1 !== rect.y1 || top.x2 !== rect.x2 || top.y2 !== rect.y2) {
+                        g_rectangles = g_rectangles.filter(rectangle => {
+                            if (rectangle.x1 !== rect.x1 || rectangle.y1 !== rect.y1 || rectangle.x2 !== rect.x2 || rectangle.y2 !== rect.y2) {
+                                return rectangle;
+                            } 
+                        })
+                        g_rectangles.push(rect);
+                    }
+                } else {
+                    if (g_doubleClick) {
+                        g_rectangles = g_rectangles.filter(rectangle => {
+                            if (rectangle.x1 !== rect.x1 || rectangle.y1 !== rect.y1 || rectangle.x2 !== rect.x2 || rectangle.y2 !== rect.y2) {
+                                return rectangle;
+                            } 
+                        })
+                    }
+                    
+                    g_dragRect = rect;
+                }
+                g_overARect = true;
+                document.body.style.cursor = "move";
+            } 
+            else {
+                g_overARect = false;
+                g_dragRect = {};
+                document.body.style.cursor = "default";
+            }
+            g_doubleClick = false;
+        }
 
         function draw(context) {
             const drawRectangle = (context, x1, y1, x2, y2, color, fill = true) => {
@@ -85,11 +200,14 @@
             g_rectangles.map(rectangle => {
                 drawRectangle(context, rectangle.x1, rectangle.y1, rectangle.x2, rectangle.y2, rectangle.color);
             })
-            drawRectangle(context, rectangle.x1, rectangle.y1, rectangle.x2, rectangle.y2, '#000000', false)
+            if (!g_isDragging) {
+                drawRectangle(context, g_rectangle.x1, g_rectangle.y1, g_rectangle.x2, g_rectangle.y2, '#000000', false)
+            }
         }
 
         (function loop () {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            update();
             draw(ctx);
             window.requestAnimationFrame(loop);
         })();
